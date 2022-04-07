@@ -1,0 +1,9 @@
+[app]
+app_id = "didomi_spark"
+app_name = "didomi_spark"
+description = "Data challenge for Didomi"
+python_path ="/home/user/miniconda3/envs/spark"
+
+[spark]
+spark_home = "/opt/spark"
+extra_java_options = "-XX:+UseG1GC"
