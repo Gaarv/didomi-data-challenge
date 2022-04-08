@@ -5,9 +5,9 @@ import structlog
 structlog.configure(
     processors=[
         structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.dev.set_exc_info,
-        structlog.processors.TimeStamper(),
         structlog.dev.ConsoleRenderer(),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.NOTSET),
@@ -15,4 +15,4 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 
-logger = structlog.get_logger("Structured Logger")
+logger: structlog.stdlib.BoundLogger = structlog.get_logger("Structured Logger")

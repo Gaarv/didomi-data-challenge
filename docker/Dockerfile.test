@@ -25,9 +25,9 @@ RUN pip3 install wheel && \
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV PYTEST_ADDOPTS="--color=yes"
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+COPY requirements-dev.txt requirements-dev.txt
+RUN pip install -r requirements-dev.txt
 
 COPY setup.py setup.py
 COPY didomi_spark didomi_spark
-RUN pip install .[dev]
+RUN pip install .

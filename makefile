@@ -1,10 +1,11 @@
 APP?=didomi-data-challenge
-DANGLING:=$(shell docker images --filter "dangling=true" -q)
 
 .PHONY: all
 
 clean:
-	docker rmi ${DANGLING} -f
+	docker stop $(shell docker ps -aq) || true
+	docker rm $(shell docker ps -aq) || true
+	docker rmi $(shell docker images --filter "dangling=true" -q) -f || true
 
 build-test:
 	docker build -f docker/Dockerfile.test  -t $(APP) .

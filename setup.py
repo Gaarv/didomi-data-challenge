@@ -16,11 +16,7 @@ setup(
     ],
     packages=find_packages(),
     python_requires=">=3.8, <4",
-    extras_require={
-        "dev": ["pip-tools<=6.6.0", "black", "pytest<=7.1.1"],
-        "test": ["coverage", "pytest<=7.1.1"],
-    },
     package_data={
-        "didomi_spark": ["data/input.zip"],
+        "didomi_spark": ["data/input.zip", "lib/json-serde-1.3.8-jar-with-dependencies.jar"],
     },
 )
