@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 import pytest
-from didomi_spark.repositories import events
+from didomi_spark.repositories.events import EventRepository
 from pyspark.sql import SparkSession
 from pytest import FixtureRequest
 
@@ -22,14 +22,16 @@ def spark_session(request: FixtureRequest):
 
 @pytest.fixture(scope="session")
 def events_input_path():
-    return events.extract_from_file(Path("didomi_spark/tests/resources/input.zip"))
+    return EventRepository.extract_from_file(Path("didomi_spark/tests/resources/input.zip"))
 
 
 @pytest.fixture(scope="session")
 def hive_metastore(spark_session: SparkSession):
-    events.create_hive_table(spark_session)
+    event_repository = EventRepository(spark_session)
+    event_repository.create_hive_table()
 
 
 @pytest.fixture(scope="session")
 def events_data(spark_session: SparkSession, events_input_path: Path, hive_metastore):
-    events.load_into_hive(spark_session, events_input_path)
+    event_repository = EventRepository(spark_session)
+    event_repository.load_into_hive(events_input_path)
