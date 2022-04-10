@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from didomi_spark.jobs.events import check_consent, map_events
+from didomi_spark.jobs.events import extract_user_consent, map_events
 from didomi_spark.repositories.events import EventRepository
 from didomi_spark.schemas.events import EventSchemas
 from pyspark.sql import SparkSession
@@ -26,6 +26,7 @@ def test_raw_events_ingestion(spark_session: SparkSession, events_data):
 def test_raw_events_schema(spark_session: SparkSession, events_data):
     event_schemas = EventSchemas()
     df = spark_session.sql("select * from raw_events")
+    print(df.schema.simpleString())
     assert df.schema == df.schema.fromJson(event_schemas.raw_event)
 
 
@@ -40,5 +41,5 @@ def test_events_schema(spark_session: SparkSession, events_data):
     event_schemas = EventSchemas()
     raw_events = spark_session.sql("select * from raw_events")
     mapped_events = map_events(raw_events)
-    print(mapped_events.schema.jsonValue())
+    print(mapped_events.schema.simpleString())
     # assert mapped_events.schema == mapped_events.schema.fromJson(event_schemas.event)
