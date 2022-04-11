@@ -15,11 +15,16 @@ class EventRepository:
         return self.spark_session.sql("select * from raw_events")
 
     def create_hive_table(self):
+        db_name = "didomi"
+        table_name = "raw_events"
         self.spark_session.sql(f"add jar didomi_spark/lib/json-serde-1.3.8-jar-with-dependencies.jar")
-        self.spark_session.sql("CREATE DATABASE IF NOT EXISTS didomi")
+        logger.info(f"Creating Hive database {db_name}")
+        self.spark_session.sql(f"DROP DATABASE IF EXISTS {db_name}")
+        self.spark_session.sql(f"CREATE DATABASE {db_name}")
+        logger.info(f"Creating Hive table {table_name}")
         self.spark_session.sql(
             f"""
-            CREATE TABLE IF NOT EXISTS raw_events (
+            CREATE TABLE IF NOT EXISTS {table_name} (
             id string,
             datetime string,
             type string,
@@ -32,7 +37,7 @@ class EventRepository:
             """
         )
         # prevents from bad JSON being inserted but insert nulls instead
-        self.spark_session.sql("ALTER TABLE raw_events SET SERDEPROPERTIES ('ignore.malformed.json'='true')")
+        self.spark_session.sql(f"ALTER TABLE {table_name} SET SERDEPROPERTIES ('ignore.malformed.json'='true')")
 
     def load_into_hive(self, input_events: Path) -> None:
         """Load event files into Hive
@@ -41,7 +46,8 @@ class EventRepository:
             spark_session (SparkSession)
             input_events (Path): absolute Path to files containing raw events
         """
-        files = list(input_events.glob("*/*.json"))  # we assume only one known partition
+        table_name = "raw_events"
+        files = list(input_events.glob("*/*.json"))  # we assume only one partition
         partitions = list(set([self._extract_partition_info(file) for file in files]))
         for partition_name, partition_value in partitions:
             for file in files:
@@ -49,7 +55,7 @@ class EventRepository:
                     self.spark_session.sql(
                         f"""
                         LOAD DATA INPATH '{file.as_posix()}' 
-                        OVERWRITE INTO TABLE raw_events
+                        OVERWRITE INTO TABLE {table_name}
                         PARTITION ({partition_name}='{partition_value}')
                         """
                     )

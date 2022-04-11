@@ -1,5 +1,8 @@
+from enum import Enum, unique
+from functools import reduce
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List
+
 from didomi_spark.core.logs import logger
 from didomi_spark.repositories.events import EventRepository
 from didomi_spark.schemas.events import EventSchemas
@@ -8,7 +11,14 @@ from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 event_schemas = EventSchemas()
-events_metrics_window = Window.partitionBy(F.col("datehour"), F.col("domain"), F.col("user_country"))
+Transformation = Callable[[DataFrame], DataFrame]
+
+
+@unique
+class EventType(Enum):
+    pageviews = "pageview"
+    consents_asked = "consent.asked"
+    consents_given = "consent.given"
 
 
 class EventJob:
@@ -18,86 +28,103 @@ class EventJob:
         self.repository = EventRepository(self.spark_session)
         self.schemas = EventSchemas()
 
-    def run(self) -> None:
+    def load(self) -> DataFrame:
         events_path = self.repository.extract_from_file(self.zip_file)
         self.repository.create_hive_table()
         self.repository.load_into_hive(events_path)
         raw_events = self.repository.fetch_raw_events()
-        deduplicated_events = deduplicate_by_event_id(raw_events)
+        return raw_events
+
+    def preprocess(self, df: DataFrame) -> DataFrame:
+        deduplicated_events = deduplicate_by_event_id(df)
         mapped_events = map_events(deduplicated_events)
+        return mapped_events
+
+    def transform(self, df: DataFrame) -> DataFrame:
+        mapped_events = self.preprocess(df)
         metrics = aggregate_events_metrics(mapped_events)
-        # save as partitionned parquet
+        return metrics
+
+    def save(self, df: DataFrame) -> None:
+        df.write.mode("overwrite").partitionBy("datehour").parquet("output")
+
+    def run(self) -> None:
+        self.save(self.transform(self.preprocess(self.load())))
 
 
-def map_events(df: DataFrame) -> DataFrame:
-    raw_cols = [F.col(c) for c in ["id", "type", "domain", "datehour"]]
-    mapped_cols = [F.col(f"user.{c}").alias(f"user_{c}") for c in ["id", "country", "token"]]
-    events = df.dropna(how="any").select(raw_cols + mapped_cols).transform(extract_user_consent)
+def map_events(raw_events: DataFrame) -> DataFrame:
+    event_cols = [F.col(f"{c}").alias(f"event_{c}") for c in ["id", "type"]]
+    raw_cols = [F.col(c) for c in ["domain", "datehour"]]
+    user_cols = [F.col(f"user.{c}").alias(f"user_{c}") for c in ["id", "country", "token"]]
+    events = raw_events.dropna(how="any").select(event_cols + raw_cols + user_cols).transform(extract_user_consent)
     return events
 
 
-def extract_user_consent(df: DataFrame) -> DataFrame:
-    df_with_consent = (
-        df.withColumn("token_data", F.from_json("user_token", schema=event_schemas.token))
+def extract_user_consent(raw_events: DataFrame) -> DataFrame:
+    user_consent = (
+        raw_events.withColumn("token_data", F.from_json("user_token", schema=event_schemas.token))
         .withColumn("user_consent", F.when(F.size("token_data.purposes.enabled") > 0, 1).otherwise(0))
-        .drop(*[F.col("token_data"), F.col("user_token")])
+        .drop("token_data", "user_token")
     )
-    return df_with_consent
+    return user_consent
 
 
-def deduplicate_by_event_id(df: DataFrame) -> DataFrame:
+def deduplicate_by_event_id(raw_events: DataFrame) -> DataFrame:
     window = Window.partitionBy(F.col("datehour"), F.col("id")).orderBy("id")
-    deduplicated_df = df.withColumn("event_id_row", F.row_number().over(window)).filter(F.col("event_id_row") == 1).drop(F.col("event_id_row"))
-    return deduplicated_df
+    deduplicated = raw_events.withColumn("event_id_row", F.row_number().over(window)).filter(F.col("event_id_row") == 1).drop("event_id_row")
+    return deduplicated
 
 
-def aggregate_events_metrics(df: DataFrame) -> DataFrame:
-    df.persist(StorageLevel.MEMORY_AND_DISK)
-    aggregated_df = (
-        df.transform(aggregate_pageviews)
-        .transform(aggregate_pageviews_with_consent)
-        .transform(aggregate_consents_asked)
-        .transform(aggregate_consents_asked_with_consent)
-        .transform(aggregate_consents_given_with_consent)
-        .transform(aggregate_avg_pageviews_per_user)
+def aggregate_events_metrics(events: DataFrame) -> DataFrame:
+    events.persist(StorageLevel.MEMORY_AND_DISK)  # cache before successive transformations
+    aggregate = aggregate_by_event_type(
+        events,
+        events_types=[
+            EventType.pageviews,
+            EventType.consents_asked,
+            EventType.consents_given,
+        ],
     )
-    return aggregated_df
-
-
-def aggregate_by_type_factory(df: DataFrame, input_col: str, output_col: str, with_consent: bool) -> Callable[DataFrame, DataFrame]:
-    pass
-
-
-def aggregate_pageviews(df: DataFrame) -> DataFrame:
-    _df = df.filter(F.col("type") == "pageview").withColumn("pageviews", F.count("type").over(events_metrics_window))
-    return _df
-
-
-def aggregate_pageviews_with_consent(df: DataFrame) -> DataFrame:
-    _df = (
-        df.filter(F.col("user_consent") == 1)
-        .filter(F.col("type") == "pageview")
-        .withColumn("pageviews_with_consent", F.count("type").over(events_metrics_window))
+    aggregate_with_consent = aggregate_by_event_type(
+        events,
+        events_types=[
+            EventType.pageviews,
+            EventType.consents_asked,
+            EventType.consents_given,
+        ],
+        with_consent=True,
     )
-    return _df
+    aggregates = aggregate.join(aggregate_with_consent, on=["datehour", "domain", "country"], how="outer").na.fill(0)
+    return aggregates
 
 
-def aggregate_consents_asked(df: DataFrame) -> DataFrame:
-    _df = df.filter(F.col("type") == "consent.asked").withColumn("consents_asked", F.count("type").over(events_metrics_window))
-    return _df
+def aggregate_by_event_type(events: DataFrame, events_types: List[EventType], with_consent: bool = False) -> DataFrame:
+    aggregated = (
+        events.transform(filter_by_user_consent(with_consent))
+        .groupBy(F.col("datehour"), F.col("domain"), F.col("user_country").alias("country"))
+        .pivot("event_type", values=[e.value for e in events_types])
+        .agg(F.count(F.col("event_type")))
+        .na.fill(0)
+        .transform(rename_by_user_consent(events_types, with_consent))
+    )
+    return aggregated
 
 
-def aggregate_consents_given(df: DataFrame) -> DataFrame:
-    pass
+def aggregate_avg_pageviews_per_user(events: DataFrame) -> DataFrame:
+    window = Window.partitionBy(F.col("datehour"), F.col("domain"), F.col("user_country"), F.col("user_id"))
+    avg_pageviews_per_user = events.filter(F.col("event_type") == EventType.pageviews.value).withColumn(
+        "avg_pageviews_per_user", F.round(F.avg(F.col("event_type")).over(window), 2)
+    )
+    return avg_pageviews_per_user
 
 
-def aggregate_consents_asked_with_consent(df: DataFrame) -> DataFrame:
-    pass
+def filter_by_user_consent(with_consent: bool = False) -> Transformation:
+    f: Transformation = lambda df: df.filter(F.col("user_consent") == 1) if with_consent else df
+    return f
 
 
-def aggregate_consents_given_with_consent(df: DataFrame) -> DataFrame:
-    pass
-
-
-def aggregate_avg_pageviews_per_user(df: DataFrame) -> DataFrame:
-    pass
+def rename_by_user_consent(events_types: List[EventType], with_consent: bool = False) -> Transformation:
+    events = [e for e in events_types]
+    column_alias: Callable[[EventType], str] = lambda e: f"{e.name}_with_consent" if with_consent else e.name
+    f: Transformation = lambda df: reduce(lambda _df, event: _df.withColumnRenamed(event.value, column_alias(event)), events, df)
+    return f

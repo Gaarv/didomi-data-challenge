@@ -10,6 +10,8 @@ attrs==21.4.0
     # via pytest
 black==22.3.0
     # via -r requirements-dev.in
+chispa==0.9.2
+    # via -r requirements-dev.in
 click==8.1.2
     # via
     #   black
