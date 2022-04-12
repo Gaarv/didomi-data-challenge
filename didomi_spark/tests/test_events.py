@@ -41,8 +41,10 @@ def test_events_schema(spark_session: SparkSession, events_data):
     assert mapped_events.schema == mapped_events.schema.fromJson(event_schemas.event)
 
 
-def test_extract_user_consent():
-    pass
+def test_extract_user_consent(spark_session: SparkSession, events_data):
+    raw_events = spark_session.sql("select * from raw_events")
+    users_consents = events.extract_user_consent(raw_events)
+    assert sum([row["user_consent"] for row in users_consents.collect()]) == 31
 
 
 def test_deduplicate_by_event_id(spark_session: SparkSession, events_data):
@@ -52,7 +54,6 @@ def test_deduplicate_by_event_id(spark_session: SparkSession, events_data):
 
 
 def test_aggregate_by_event_type(mapped_events_data: DataFrame):
-    print("DEBUG", mapped_events_data.show(100, truncate=False))
     pageviews = events.aggregate_by_event_type(mapped_events_data, events_types=[events.EventType.pageviews])
     assert sum([row["pageviews"] for row in pageviews.collect()]) == 31
 
@@ -62,13 +63,13 @@ def test_aggregate_by_event_type_with_consent(mapped_events_data: DataFrame):
     assert sum([row["pageviews_with_consent"] for row in pageviews_with_consent.collect()]) == 16
 
 
-def test_aggregate_events_metrics(mapped_events_data: DataFrame):
-    event_schemas = EventSchemas()
-    events_metrics = events.aggregate_events_metrics(mapped_events_data)
-    print("DEBUG", events_metrics.show(100, truncate=False))
-    assert events_metrics.schema == events_metrics.schema.fromJson(event_schemas.events_metrics)
-
-
 def test_aggregate_avg_pageviews_per_user(mapped_events_data: DataFrame):
-    aggregate_avg_pageviews_per_user = events.aggregate_avg_pageviews_per_user(mapped_events_data)
-    print("DEBUG", aggregate_avg_pageviews_per_user.show(100, truncate=False))
+    avg_pageviews_per_user = events.aggregate_avg_pageviews_per_user(mapped_events_data)
+    assert sum([row["avg_pageviews_per_user"] for row in avg_pageviews_per_user.collect()]) == 21.83
+
+
+def test_aggregate_events_metrics(spark_session: SparkSession, events_data):
+    raw_events = spark_session.sql("select * from raw_events")
+    event_schemas = EventSchemas()
+    events_metrics = events.aggregate_events_metrics(raw_events)
+    assert events_metrics.schema == events_metrics.schema.fromJson(event_schemas.events_metrics)

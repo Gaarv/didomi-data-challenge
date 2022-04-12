@@ -63,6 +63,7 @@ class EventSchemas:
                 {"name": "pageviews_with_consent", "type": "long", "nullable": True, "metadata": {}},
                 {"name": "consents_asked_with_consent", "type": "long", "nullable": True, "metadata": {}},
                 {"name": "consents_given_with_consent", "type": "long", "nullable": True, "metadata": {}},
+                {"name": "avg_pageviews_per_user", "type": "double", "nullable": False, "metadata": {}},
             ],
         }
         return schema
