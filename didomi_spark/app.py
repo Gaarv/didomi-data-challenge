@@ -8,6 +8,8 @@ applications = {"events": EventJob}
 
 
 def run_application(**kwargs):
+    """_summary_
+    """
     app = kwargs.get("app", None)
     mode = kwargs.get("mode", "cluster")
     if app in applications:

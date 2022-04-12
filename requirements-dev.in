@@ -8,3 +8,6 @@ pytest<=7.1.1
 pip-tools<=6.6.0
 black
 pytest-cov==3.0.0
+Sphinx==4.5.0
+sphinx-rtd-theme==1.0.0
+myst-parser==0.17.0
