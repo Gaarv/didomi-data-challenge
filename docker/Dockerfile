@@ -1,32 +1,28 @@
-FROM ubuntu:20.04
+FROM python:3.9-slim
 
-ARG JDK_VERSION=11
+ENV JDK_VERSION=11
+ENV JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends curl build-essential openjdk-${JDK_VERSION}-jdk \
-    python3-dev python3-pip python3-venv python3-wheel && \
+    apt-get install -qqy --no-install-recommends curl build-essential openjdk-${JDK_VERSION}-jdk && \
     rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
-ENV VIRTUAL_ENV=/app/venv
+ENV SPARK_VERSION=spark-3.2.1-bin-hadoop3.2
+ENV SPARK_BIN_VERSION=spark-3.2.1
+ENV SPARK_HOME=/opt/${SPARK_VERSION}
 
-ENV SPARK_HOME=/opt/spark-3.2.1-bin-hadoop3.2
 ENV PYSPARK_MAJOR_PYTHON_VERSION=3
-ENV PYSPARK_PYTHON=$VIRTUAL_ENV
+ENV PYSPARK_PYTHON=python3
 
-RUN curl -k -o spark-3.2.1-bin-hadoop3.2.tgz https://dlcdn.apache.org/spark/spark-3.2.1/spark-3.2.1-bin-hadoop3.2.tgz
-RUN tar zxf spark-3.2.1-bin-hadoop3.2.tgz --directory /opt
+RUN curl -k -o ${SPARK_VERSION}.tgz https://dlcdn.apache.org/spark/${SPARK_BIN_VERSION}/${SPARK_VERSION}.tgz
+RUN tar zxf ${SPARK_VERSION}.tgz --directory /opt
 
 RUN mkdir -p /app
 WORKDIR /app
-
-RUN pip3 install wheel && \
-    python3 -m venv $VIRTUAL_ENV
-
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 COPY setup.py setup.py
 COPY didomi_spark didomi_spark
+
 RUN pip install .
