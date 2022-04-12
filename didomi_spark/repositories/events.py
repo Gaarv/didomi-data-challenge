@@ -4,14 +4,17 @@ from pathlib import Path
 from typing import Tuple
 
 from didomi_spark.core.logs import logger
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import DataFrame, SparkSession
 
 
 class EventRepository:
     def __init__(self, spark_session: SparkSession) -> None:
         self.spark_session = spark_session
 
-    def fetch_raw_events(self) -> DataFrame:
+    def fetch_raw_events_from_s3(self) -> DataFrame:
+        raise NotImplementedError
+
+    def fetch_raw_events_from_hive(self) -> DataFrame:
         return self.spark_session.sql("select * from raw_events")
 
     def create_hive_table(self):

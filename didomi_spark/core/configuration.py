@@ -25,10 +25,5 @@ class Configuration:
         conf = SparkConf()
         conf.setAppName(self.conf["app"]["app_name"])
         conf.set("spark.app.id", self.conf["app"]["app_id"])
-        conf.set("spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON", self.conf["spark"]["python_path"])
-        conf.set("spark.yarn.appMasterEnv.PYTHONPATH", self.conf["spark"]["python_path"])
-        conf.set("spark.yarn.appMasterEnv.PYSPARK_PYTHON", self.conf["spark"]["python_path"])
-        conf.set("spark.executorEnv.PYSPARK_PYTHON", self.conf["spark"]["python_path"])
-        conf.set("spark.executorEnv.PYTHONPATH", self.conf["spark"]["python_path"])
         conf.set("spark.executor.extraJavaOptions", self.conf["spark"]["extra_java_options"])
         return conf

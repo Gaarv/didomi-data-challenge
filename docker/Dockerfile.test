@@ -22,6 +22,7 @@ WORKDIR /app
 
 COPY requirements-dev.txt requirements-dev.txt
 RUN pip install -r requirements-dev.txt
+COPY docker/.coveragerc /app/.coveragerc
 
 COPY setup.py setup.py
 COPY didomi_spark didomi_spark

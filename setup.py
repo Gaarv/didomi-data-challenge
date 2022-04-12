@@ -17,6 +17,10 @@ setup(
     packages=find_packages(),
     python_requires=">=3.8, <4",
     package_data={
-        "didomi_spark": ["data/input.zip", "lib/json-serde-1.3.8-jar-with-dependencies.jar"],
+        "didomi_spark": [
+            "data/input.zip",
+            "lib/json-serde-1.3.8-jar-with-dependencies.jar",
+            "core/configuration.toml",
+        ],
     },
 )

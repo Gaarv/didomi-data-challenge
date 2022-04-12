@@ -12,11 +12,12 @@ build-test:
 	docker tag $(APP) $(APP):test
 
 test:
-	docker run $(APP):test pytest -v -s
+	docker run --name didomi-data-challenge-test $(APP):test pytest --cov -v -s
 
 build:
-	docker build -f docker/Dockerfile  -t $(APP) .
+	docker build -f docker/Dockerfile -t $(APP) .
 	docker tag $(APP) $(APP):latest
 
 run:
-	docker run $(APP):latest python main.py
+	docker run --name didomi-data-challenge $(APP):latest python /app/didomi_spark/app.py app=events mode=local
+	docker cp didomi-data-challenge:/app/output .

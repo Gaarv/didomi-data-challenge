@@ -1,9 +1,7 @@
 import sys
 
-from pyspark.sql import SparkSession
-
-from didomi_spark.core.configuration import Configuration
 from didomi_spark.core.logs import logger
+from didomi_spark.core.session import build_spark_session
 from didomi_spark.jobs.events import EventJob
 
 applications = {"events": EventJob}
@@ -11,9 +9,12 @@ applications = {"events": EventJob}
 
 def run_application(**kwargs):
     app = kwargs.get("app", None)
+    mode = kwargs.get("mode", "cluster")
     if app in applications:
-        spark_session = SparkSession.builder.config(conf=Configuration().spark_conf).enableHiveSupport().getOrCreate()
-        applications["app"](spark_session).run()
+        cluster_mode = True if mode == "cluster" else False
+        spark_session = build_spark_session(cluster_mode)
+        job = applications[app](spark_session)
+        job.run(cluster_mode)
     else:
         logger.error(f"Application {app} unkown.")
 

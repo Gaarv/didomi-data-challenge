@@ -8,6 +8,7 @@ from didomi_spark.schemas.events import EventSchemas
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from s3path import S3Path
 
 event_schemas = EventSchemas()
 Transformation = Callable[[DataFrame], DataFrame]
@@ -23,26 +24,38 @@ class EventType(Enum):
 class EventJob:
     def __init__(self, spark_session: SparkSession) -> None:
         self.spark_session = spark_session
-        self.zip_file = Path("didomi_spark/data/input.zip")
         self.repository = EventRepository(self.spark_session)
         self.schemas = EventSchemas()
 
-    def load(self) -> DataFrame:
-        events_path = self.repository.extract_from_file(self.zip_file)
-        self.repository.create_hive_table()
-        self.repository.load_into_hive(events_path)
-        raw_events = self.repository.fetch_raw_events()
+    def load(self, cluster_mode: bool = True) -> DataFrame:
+        if cluster_mode:
+            events_path = S3Path("/didomi_spark/input/events")
+            raw_events = self.repository.fetch_raw_events_from_s3()
+        else:
+            zip_file = Path("didomi_spark/data/input.zip")
+            events_path = self.repository.extract_from_file(zip_file)
+            self.repository.create_hive_table()
+            self.repository.load_into_hive(events_path)
+            raw_events = self.repository.fetch_raw_events_from_hive()
         return raw_events
 
     def transform(self, df: DataFrame) -> DataFrame:
         metrics = aggregate_events_metrics(df)
         return metrics
 
-    def save(self, df: DataFrame) -> None:
-        df.write.mode("overwrite").partitionBy("datehour").parquet("output")
+    def save(self, df: DataFrame, cluster_mode: bool = True) -> None:
+        if cluster_mode:
+            remote_path = S3Path("/didomi_spark/output/events").as_uri()
+            logger.info(f"Saving output...", output_path=remote_path)
+            df.write.mode("overwrite").partitionBy("datehour").parquet(remote_path)
+        else:
+            local_path = Path("output").absolute().as_posix()
+            logger.info(f"Saving output...", output_path=local_path)
+            df.write.mode("overwrite").partitionBy("datehour").parquet(local_path)
 
-    def run(self) -> None:
-        self.save(self.transform(self.load()))
+    def run(self, cluster_mode: bool = True) -> None:
+        events = self.load(cluster_mode)
+        self.save(self.transform(events), cluster_mode)
 
 
 def map_events(raw_events: DataFrame) -> DataFrame:
