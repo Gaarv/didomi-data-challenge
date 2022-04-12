@@ -6,19 +6,10 @@ RUN apt-get update && \
     apt-get install -qqy --no-install-recommends curl build-essential openjdk-${JDK_VERSION}-jdk && \
     rm -rf /var/lib/apt/lists/*
 
-ENV SPARK_VERSION=spark-3.2.1-bin-hadoop3.2
-ENV SPARK_BIN_VERSION=spark-3.2.1
-ENV SPARK_HOME=/opt/${SPARK_VERSION}
-
-ENV PYSPARK_MAJOR_PYTHON_VERSION=3
-ENV PYSPARK_PYTHON=python3
-ENV PYTEST_ADDOPTS="--color=yes"
-
-RUN curl -k -o ${SPARK_VERSION}.tgz https://dlcdn.apache.org/spark/${SPARK_BIN_VERSION}/${SPARK_VERSION}.tgz
-RUN tar zxf ${SPARK_VERSION}.tgz --directory /opt
-
 RUN mkdir -p /app
 WORKDIR /app
+
+ENV PYTEST_ADDOPTS="--color=yes"
 
 COPY requirements-dev.txt requirements-dev.txt
 RUN pip install -r requirements-dev.txt

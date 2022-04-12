@@ -1,17 +1,17 @@
 Didomi Data Challenge
-========
+=====================
 
 
-README
-------
+Documentation
+-------------
 .. toctree::
     :maxdepth: 2
 
    ./README.md
 
 
-Indices and tables
-------------------
+API Documentation
+-----------------
 
 * :ref:`genindex`
 * :ref:`modindex`

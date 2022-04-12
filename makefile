@@ -12,11 +12,11 @@ build-test:
 	docker tag $(APP) $(APP):test
 
 test:
-	docker run --name didomi-data-challenge-test $(APP):test pytest --cov -v -s
+	docker run $(APP):test pytest --cov -v -s
 
 build-docs:
 	sphinx-apidoc -f -M -o docs/source/ didomi_spark/ "**/tests/"
-	cp README.md docs/source/
+	cp README.md docs/
 	$(MAKE) -C docs html
 
 build:
@@ -26,3 +26,4 @@ build:
 run:
 	docker run --name didomi-data-challenge $(APP):latest python /app/didomi_spark/app.py app=events mode=local
 	docker cp didomi-data-challenge:/app/output .
+	docker rm didomi-data-challenge

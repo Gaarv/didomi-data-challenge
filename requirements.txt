@@ -14,12 +14,24 @@ jmespath==1.0.0
     # via
     #   boto3
     #   botocore
+numpy==1.22.3
+    # via
+    #   pandas
+    #   pyarrow
+pandas==1.4.2
+    # via pyspark
 py4j==0.10.9.3
     # via pyspark
-pyspark==3.2.1
+pyarrow==7.0.0
+    # via pyspark
+pyspark[sql]==3.2.1
     # via -r requirements.in
 python-dateutil==2.8.2
-    # via botocore
+    # via
+    #   botocore
+    #   pandas
+pytz==2022.1
+    # via pandas
 s3path==0.3.4
     # via -r requirements.in
 s3transfer==0.5.2

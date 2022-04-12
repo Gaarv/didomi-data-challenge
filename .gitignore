@@ -11,6 +11,7 @@ venv
 build-pkg/*
 spark-warehouse
 metastore_db
+output
 derby.log
 docs/_build/
 docs/_static/
