@@ -30,7 +30,7 @@ class EventJob:
     def load(self, cluster_mode: bool = True) -> DataFrame:
         if cluster_mode:
             events_path = S3Path("/didomi_spark/input/events")
-            raw_events = self.repository.fetch_raw_events_from_s3()
+            raw_events = self.repository.fetch_raw_events_from_s3(events_path)
         else:
             zip_file = Path("didomi_spark/data/input.zip")
             events_path = self.repository.extract_from_file(zip_file)
@@ -45,13 +45,12 @@ class EventJob:
 
     def save(self, df: DataFrame, cluster_mode: bool = True) -> None:
         if cluster_mode:
-            remote_path = S3Path("/didomi_spark/output/events").as_uri()
-            logger.info(f"Saving output...", output_path=remote_path)
-            df.write.mode("overwrite").partitionBy("datehour").parquet(remote_path)
+            output_path = S3Path("/didomi_spark/output/events").as_uri()
         else:
-            local_path = Path("output").absolute().as_posix()
-            logger.info(f"Saving output...", output_path=local_path)
-            df.write.mode("overwrite").partitionBy("datehour").parquet(local_path)
+            output_path = Path("output").absolute().as_posix()
+
+        logger.info(f"Saving output...", output_path=output_path)
+        df.write.mode("overwrite").partitionBy("datehour").parquet(output_path)
 
     def run(self, cluster_mode: bool = True) -> None:
         events = self.load(cluster_mode)

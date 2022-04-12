@@ -5,13 +5,14 @@ from typing import Tuple
 
 from didomi_spark.core.logs import logger
 from pyspark.sql import DataFrame, SparkSession
+from s3path import S3Path
 
 
 class EventRepository:
     def __init__(self, spark_session: SparkSession) -> None:
         self.spark_session = spark_session
 
-    def fetch_raw_events_from_s3(self) -> DataFrame:
+    def fetch_raw_events_from_s3(self, uri: S3Path) -> DataFrame:
         raise NotImplementedError
 
     def fetch_raw_events_from_hive(self) -> DataFrame:
@@ -21,10 +22,10 @@ class EventRepository:
         db_name = "didomi"
         table_name = "raw_events"
         self.spark_session.sql(f"add jar didomi_spark/lib/json-serde-1.3.8-jar-with-dependencies.jar")
-        logger.info(f"Creating Hive database {db_name}")
+        logger.info(f"Creating Hive database", db_name=db_name)
         self.spark_session.sql(f"DROP DATABASE IF EXISTS {db_name}")
         self.spark_session.sql(f"CREATE DATABASE {db_name}")
-        logger.info(f"Creating Hive table {table_name}")
+        logger.info(f"Creating Hive table", table_name=table_name)
         self.spark_session.sql(
             f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
@@ -51,6 +52,7 @@ class EventRepository:
         """
         table_name = "raw_events"
         files = list(input_events.glob("*/*.json"))  # we assume only one partition
+        logger.info("Loading files into Hive...", num_files=len(files), table_name=table_name)
         partitions = list(set([self._extract_partition_info(file) for file in files]))
         for partition_name, partition_value in partitions:
             for file in files:
@@ -66,8 +68,8 @@ class EventRepository:
     @staticmethod
     def extract_from_file(zip_file: Path) -> Path:
         dest = Path(tempfile.mkdtemp())
+        logger.info("Extracting input data...", input_file=zip_file.as_posix(), output_dir=dest.as_posix())
         shutil.unpack_archive(zip_file, dest)
-        logger.info(f"Extracted {zip_file} to {dest}.")
         return dest
 
     @staticmethod
