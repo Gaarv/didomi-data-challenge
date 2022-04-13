@@ -8,8 +8,7 @@ applications = {"events": EventJob}
 
 
 def run_application(**kwargs):
-    """_summary_
-    """
+    """Entrypoint to run a specified application based on those availables in the "applications" variable."""
     app = kwargs.get("app", None)
     mode = kwargs.get("mode", "cluster")
     if app in applications:

@@ -9,6 +9,8 @@ from s3path import S3Path
 
 
 class EventRepository:
+    """Centralize interaction with data sources"""
+
     def __init__(self, spark_session: SparkSession) -> None:
         self.spark_session = spark_session
 
@@ -19,6 +21,9 @@ class EventRepository:
         return self.spark_session.sql("select * from raw_events")
 
     def create_hive_table(self):
+        """Create Hive table where :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event` data will be loaded.
+        In a real life scenario this would be probably handled by a separated job / service outside of Spark for idempotency.
+        """
         db_name = "didomi"
         table_name = "raw_events"
         self.spark_session.sql(f"add jar didomi_spark/lib/json-serde-1.3.8-jar-with-dependencies.jar")
@@ -44,7 +49,7 @@ class EventRepository:
         self.spark_session.sql(f"ALTER TABLE {table_name} SET SERDEPROPERTIES ('ignore.malformed.json'='true')")
 
     def load_into_hive(self, input_events: Path) -> None:
-        """Load event files into Hive
+        """Load raw event files into Hive
 
         Args:
             spark_session (SparkSession)
@@ -67,6 +72,14 @@ class EventRepository:
 
     @staticmethod
     def extract_from_file(zip_file: Path) -> Path:
+        """Extract zip file containing raw events
+
+        Args:
+            zip_file (Path): relative path from root package to the zip file, ie. "didomi_spark/data/input.zip"
+
+        Returns:
+            Path: path to extracted files
+        """
         dest = Path(tempfile.mkdtemp())
         logger.info("Extracting input data...", input_file=zip_file.as_posix(), output_dir=dest.as_posix())
         shutil.unpack_archive(zip_file, dest)
@@ -74,7 +87,7 @@ class EventRepository:
 
     @staticmethod
     def _extract_partition_info(filepath: Path) -> Tuple[str, str]:
-        """Extract partition name and value from partitionned file Path
+        """Extract partition name and value from partitionned file Path. Only meant to be used in local mode or tests.
 
         Args:
             filepath (Path): absolute Path to file, ie. path/to/dt=2022-01-01/file

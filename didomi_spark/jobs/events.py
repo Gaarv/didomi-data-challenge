@@ -89,6 +89,14 @@ class EventJob:
 
 
 def map_events(raw_events: DataFrame) -> DataFrame:
+    """Map :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event` to :attr:`~didomi_spark.schemas.events.EventSchemas.event`.
+
+    Args:
+        raw_events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.event`
+    """
     event_cols = [F.col(f"{c}").alias(f"event_{c}") for c in ["id", "type"]]
     raw_cols = [F.col(c) for c in ["domain", "datehour"]]
     user_cols = [F.col(f"user.{c}").alias(f"user_{c}") for c in ["id", "country"]]
@@ -98,6 +106,14 @@ def map_events(raw_events: DataFrame) -> DataFrame:
 
 
 def extract_user_consent(raw_events: DataFrame) -> DataFrame:
+    """Extract if user consent was given or not from :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Args:
+        raw_events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event` with an additional column "user_consent"
+    """
     token_data = raw_events.withColumn("token_data", F.from_json("user.token", schema=event_schemas.token))
     user_consent = token_data.withColumn("user_consent", F.when(F.size("token_data.purposes.enabled") > 0, 1).otherwise(0))
     user_consent = user_consent.drop("token_data", "user.token")
@@ -105,6 +121,14 @@ def extract_user_consent(raw_events: DataFrame) -> DataFrame:
 
 
 def deduplicate_by_event_id(raw_events: DataFrame) -> DataFrame:
+    """Deduplicate :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event` based on column "id
+
+    Args:
+        raw_events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+    """
     window = Window.partitionBy(F.col("datehour"), F.col("id")).orderBy("id")
     deduplicated = raw_events.withColumn("event_id_row", F.row_number().over(window)).filter(F.col("event_id_row") == 1)
     deduplicated = deduplicated.drop("event_id_row")
@@ -112,6 +136,14 @@ def deduplicate_by_event_id(raw_events: DataFrame) -> DataFrame:
 
 
 def aggregate_events_metrics(raw_events: DataFrame) -> DataFrame:
+    """Aggregate metrics from :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Args:
+        raw_events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics`
+    """
     deduplicated_raw_events = deduplicate_by_event_id(raw_events)
     events = map_events(deduplicated_raw_events).persist(StorageLevel.MEMORY_AND_DISK)  # cache before successive transformations
     aggregated = aggregate_by_event_type(
@@ -140,6 +172,17 @@ def aggregate_events_metrics(raw_events: DataFrame) -> DataFrame:
 
 
 def aggregate_by_event_type(events: DataFrame, events_types: List[EventType], with_consent: bool = False) -> DataFrame:
+    """Factory function to aggregate :attr:`~didomi_spark.schemas.events.EventSchemas.event`
+    depending if user consent was positive or negative.
+
+    Args:
+        events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.event`
+        events_types (List[EventType]): list of EventType to use for pivot
+        with_consent (bool, optional): filter by positive user_consent if True. Defaults to False.
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics` without column "avg_pageviews_per_user"
+    """
     # Filter based on consent
     filtered = events.filter(F.col("user_consent") == 1) if with_consent else events
 
@@ -159,6 +202,14 @@ def aggregate_by_event_type(events: DataFrame, events_types: List[EventType], wi
 
 
 def aggregate_avg_pageviews_per_user(events: DataFrame) -> DataFrame:
+    """Aggregate the average pageviews per user from :attr:`~didomi_spark.schemas.events.EventSchemas.event`
+
+    Args:
+        events (DataFrame): :attr:`~didomi_spark.schemas.events.EventSchemas.event`
+
+    Returns:
+        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics` with columns "datehour", "domain", "country" and "avg_pageviews_per_user"
+    """
     avg_pageviews_per_user = (
         events.select(F.col("datehour"), F.col("domain"), F.col("user_country").alias("country"), F.col("user_id"), F.col("event_type"))
         .filter(F.col("event_type") == EventType.pageviews.value)

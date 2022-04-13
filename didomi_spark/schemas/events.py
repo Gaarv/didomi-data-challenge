@@ -2,6 +2,8 @@ from typing import Dict, Any
 
 
 class EventSchemas:
+    """Centralize schemas used in :obj:`~didomi_spark.jobs.events.EventJob`."""
+
     @property
     def raw_event(self) -> Dict[str, Any]:
         schema = {
