@@ -4,23 +4,25 @@ My take on Didomi challenge (Data engineering): https://github.com/didomi/challe
 
 # Documentation
 
-To ensure reproductibility given some dependencies that relies a lot on environment variables (Spark, Hadoop, Java), varying from each operating system, the application is delivered as a **Docker image** to be built and run. All sources are included.
+To ensure reproducibility given some dependencies that rely a lot on environment variables (Spark, Hadoop, Java) and vary from each operating system, the application is delivered as a **Docker image** to be built and run.
 
 <br/>
 
 ## The challenge
 
-Due to time constraints to build a deployable cluster environment on AWS and dependencies that would have to be provided by reviewers to run the application on a cluster (such as credentials) I decided to focus primarly on delivering a Spark application that runs in local mode.
+Due to time constraints to build a deployable cluster environment on AWS and dependencies that would have to be provided by reviewers to run the application on a cluster (such as credentials), I decided to focus primarily on delivering a Spark application that runs in local mode.
 
-The code is fundamentally runnable as-is in cluster mode but I/O functions such as loading or writing data to S3 still needs to be fully implemented.
+The code is fundamentally runnable as-is in cluster mode except for some I/O functions such as loading and writing data on S3 (or another data source) that would need implementation.
 
-Rather than loading directly the challenge input data with `spark.read.json()`, I also made the choice to use **Hive** in local mode to ingest the data and make use of the provided `datehour` partitionning.
+Rather than directly loading the challenge input data with `spark.read.json()`, I chose **Hive** in local mode to ingest the data and use the provided `datehour` partitioning.
 
 <br/>
 
-## Code structure
+## Project structure
 
-Code is structured as a [monorepository](https://en.wikipedia.org/wiki/Monorepo) that can be expanded with new Spark jobs, schemas and data sources while reusing most of the same codebase.
+Project structured as a [monorepository](https://en.wikipedia.org/wiki/Monorepo) that can be expanded with new Spark jobs, schemas, and data sources while sharing most of the same codebase.
+
+Python source code formatted with [Black](https://github.com/psf/black).
 
 ```
 didomi-data-challenge
@@ -31,12 +33,12 @@ didomi-data-challenge
 │   ├── __init__.py
 │   ├── app.py           # application entrypoint (main)
 │   ├── core             # core components (spark session, logs, configuration)
-│   ├── data             # provided input data for local mode
+│   ├── data             # provided input data for the challenge
 │   ├── jobs             # Spark jobs
 │   ├── lib              # additionnal libs / jars needed
 │   ├── repositories     # classes and functions used to interact with data sources
 │   ├── schemas          # dataframes schemas
-│   └── tests            # tests for the application (run spark jobs)
+│   └── tests            # tests for the application (run spark jobs locally)
 ├── docker
 │   ├── Dockerfile       # Dockerfile used to run the application
 │   └── Dockerfile.test  # Dockerfile used to test the application
@@ -63,26 +65,27 @@ didomi-data-challenge
 
 <br/>
 
-A Makefile is provided and targets provides convenient shortcuts for each task.
+A Makefile provides convenient shortcuts for each task.
 
 <br/>
 
-## Build the Docker image
+## Build Docker image
 
-
-To build the image, at the root directory run the command:
+To build the image application, at the root directory run the command:
 
 `make build`
 
 <br/>
 
-## Run the Docker image
+## Run Docker image
+
+After building the image application, run the command:
 
 `make run`
 
 This will call the `app.py` entrypoint with keyword arguments `app=events` and `mode=local`.
 
-When the Spark application has completed, a directory `output` will be created in the local current directory with the job output written as compressed Parquet files partionned by `datehour`.
+When the Spark job is complete, it creates a directory `output` in the current local directory with the job output written as compressed Parquet files partitioned by `datehour`.
 
 ```
 output/
@@ -97,35 +100,49 @@ output/
 
 <br/>
 
-## Run the tests
+## Run tests
 
 Similarly, tests can be run with:
 
-`make build-test` and then `make test`
+`make build-test`
 
-or more succintly `make build-test test`
+to build the Docker image with test dependencies and then
 
-Tests output are then printed on the console as well as code coverage. Since those are not unit tests but functionnal tests running Spark jobs, this can take some time.
+`make test`
+
+or more succintly
+
+`make build-test test`
+
+The console prints tests outputs as well as code coverage.
 
 <br/>
 
-## Setting up a development environment
+## Development environment
 
-* prerequisites: OpenJDK 11
+### Setup
+
 * create a dedicated Python virtual environment, ie. with [conda](https://docs.conda.io/en/latest/miniconda.html): `conda create -n didomi-spark python=3.9 pip`
 * install dev dependencies with `pip install -r requirements-dev.txt`
+* make sure you have JDK 11+ and environment variable JAVA_HOME set
+
+The Docker test image can be used to run tests, see [Run tests](#run-the-tests).
 
 <br/>
 
-## Updating dependencies
+### Updating dependencies
 
 The requirements files `requirements.txt` and `requirements-dev.txt` are generated with `pip-compile` from [pip-tools](https://github.com/jazzband/pip-tools). 
 
 * update `requirements.in` and `requirements-dev.in` as needed
-* run `pip-compile requirements.in` or `pip-compile requirements-dev.in` to update the compiled requirements.
+* run `pip-compile requirements.in` and `pip-compile requirements-dev.in` to update the compiled requirements.
 
 <br/>
 
-## Building the documentation
+### Building the documentation
 
-API Documentation from docstrings can be built with `make build-docs` and will be available at didomi-data-challenge/docs/_build/html/index.html
+API Documentation from docstrings can be built with
+
+`make build-docs`
+ 
+and will be available at `didomi-data-challenge/docs/_build/html/index.html`
