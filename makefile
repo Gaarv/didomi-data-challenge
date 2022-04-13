@@ -12,7 +12,7 @@ build-test:
 	docker tag $(APP) $(APP):test
 
 test:
-	docker run $(APP):test pytest --cov -v -s
+	docker run --rm $(APP):test pytest --cov -v -s
 
 build-docs:
 	sphinx-apidoc -f -M -o docs/source/ didomi_spark/ "**/tests/"
