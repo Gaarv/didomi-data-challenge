@@ -126,7 +126,7 @@ The console prints tests outputs as well as code coverage.
 * install dev dependencies with `pip install -r requirements-dev.txt`
 * make sure you have JDK 11+ and environment variable JAVA_HOME set
 
-The Docker test image can be used to run tests, see [Run tests](#run-the-tests).
+The Docker test image can be used to run tests, see [Run tests](#run-tests).
 
 <br/>
 

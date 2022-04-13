@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Callable, List
 
 from didomi_spark.core.logs import logger
+from didomi_spark.core.configuration import Configuration
 from didomi_spark.repositories.events import EventRepository
 from didomi_spark.schemas.events import EventSchemas
 from pyspark import StorageLevel
@@ -22,17 +23,28 @@ class EventType(Enum):
 
 
 class EventJob:
+    """Class representing a job that process :obj:`~didomi_spark.schemas.events.EventSchemas` data."""
+
     def __init__(self, spark_session: SparkSession) -> None:
         self.spark_session = spark_session
         self.repository = EventRepository(self.spark_session)
         self.schemas = EventSchemas()
+        self.conf = Configuration()
 
     def load(self, cluster_mode: bool = True) -> DataFrame:
+        """Loads data from :obj:`~didomi_spark.repositories.events.EventRepository`
+
+        Args:
+            cluster_mode (bool, optional): Whether to run in clutser mode or local mode. Defaults to True.
+
+        Returns:
+            DataFrame: DataFrame with schema :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+        """
         if cluster_mode:
-            events_path = S3Path("/didomi_spark/input/events")
+            events_path = S3Path(self.conf.events_path_s3)
             raw_events = self.repository.fetch_raw_events_from_s3(events_path)
         else:
-            zip_file = Path("didomi_spark/data/input.zip")
+            zip_file = Path(self.conf.events_path_local)
             events_path = self.repository.extract_from_file(zip_file)
             self.repository.create_hive_table()
             self.repository.load_into_hive(events_path)
@@ -40,19 +52,38 @@ class EventJob:
         return raw_events
 
     def transform(self, df: DataFrame) -> DataFrame:
+        """Perform aggregations. This function isolate core logic from input and output side effects.
+
+        Args:
+            df (DataFrame): DataFrame with schema :attr:`~didomi_spark.schemas.events.EventSchemas.raw_event`
+
+        Returns:
+            DataFrame: DataFrame with schema :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics`
+        """
         metrics = aggregate_events_metrics(df)
         return metrics
 
     def save(self, df: DataFrame, cluster_mode: bool = True) -> None:
+        """Loads output DataFrame into defined output location.
+
+        Args:
+            df (DataFrame): DataFrame with schema :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics`
+            cluster_mode (bool, optional): Whether to run in clutser mode or local mode. Defaults to True.
+        """
         if cluster_mode:
-            output_path = S3Path("/didomi_spark/output/events").as_uri()
+            output_path = S3Path(self.conf.output_path_s3).as_uri()
         else:
-            output_path = Path("output").absolute().as_posix()
+            output_path = Path(self.conf.output_path_local).absolute().as_posix()
 
         logger.info(f"Saving output...", output_path=output_path)
         df.write.mode("overwrite").partitionBy("datehour").parquet(output_path)
 
     def run(self, cluster_mode: bool = True) -> None:
+        """Compose functions used for :obj:`~didomi_spark.jobs.events.EventJob`.
+
+        Args:
+            cluster_mode (bool, optional): Whether to run in clutser mode or local mode. Defaults to True.
+        """
         events = self.load(cluster_mode)
         self.save(self.transform(events), cluster_mode)
 

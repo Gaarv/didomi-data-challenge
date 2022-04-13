@@ -4,4 +4,8 @@ app_name = "didomi_spark"
 description = "Data challenge for Didomi"
 
 [spark]
+events_path_local = "didomi_spark/data/input.zip"
+events_path_s3 = "/didomi_spark/input/events"
 extra_java_options = "-XX:+UseG1GC"
+output_path_local = "output"
+output_path_s3 = "/didomi_spark/output/events"
