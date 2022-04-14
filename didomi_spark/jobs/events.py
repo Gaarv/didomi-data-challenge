@@ -145,7 +145,7 @@ def aggregate_events_metrics(raw_events: DataFrame) -> DataFrame:
         DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics`
     """
     deduplicated_raw_events = deduplicate_by_event_id(raw_events)
-    events = map_events(deduplicated_raw_events).persist(StorageLevel.MEMORY_AND_DISK)  # cache before successive transformations
+    events = map_events(deduplicated_raw_events).cache()  # cache before successive transformations
     aggregated = aggregate_by_event_type(
         events,
         events_types=[
@@ -181,7 +181,7 @@ def aggregate_by_event_type(events: DataFrame, events_types: List[EventType], wi
         with_consent (bool, optional): filter by positive user_consent if True. Defaults to False.
 
     Returns:
-        DataFrame: :attr:`~didomi_spark.schemas.events.EventSchemas.events_metrics` without column "avg_pageviews_per_user"
+        DataFrame: DataFrame with columns "datehour", "domain", "country" with events_types and consent as selected.
     """
     # Filter based on consent
     filtered = events.filter(F.col("user_consent") == 1) if with_consent else events

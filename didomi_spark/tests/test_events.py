@@ -44,27 +44,33 @@ def test_events_schema(spark_session: SparkSession, events_data):
 def test_extract_user_consent(spark_session: SparkSession, events_data):
     raw_events = spark_session.sql("select * from raw_events")
     users_consents = events.extract_user_consent(raw_events)
+    assert users_consents.columns == raw_events.columns + ["user_consent"]
     assert sum([row["user_consent"] for row in users_consents.collect()]) == 31
 
 
 def test_deduplicate_by_event_id(spark_session: SparkSession, events_data):
+    event_schemas = EventSchemas()
     raw_events = spark_session.sql("select * from raw_events")
     deduplicated = events.deduplicate_by_event_id(raw_events)
+    assert deduplicated.schema == raw_events.schema.fromJson(event_schemas.raw_event)
     assert deduplicated.count() == 57
 
 
 def test_aggregate_by_event_type(mapped_events_data: DataFrame):
     pageviews = events.aggregate_by_event_type(mapped_events_data, events_types=[events.EventType.pageviews])
+    assert pageviews.columns == ["datehour", "domain", "country", "pageviews"]
     assert sum([row["pageviews"] for row in pageviews.collect()]) == 31
 
 
 def test_aggregate_by_event_type_with_consent(mapped_events_data: DataFrame):
     pageviews_with_consent = events.aggregate_by_event_type(mapped_events_data, events_types=[events.EventType.pageviews], with_consent=True)
+    assert pageviews_with_consent.columns == ["datehour", "domain", "country", "pageviews_with_consent"]
     assert sum([row["pageviews_with_consent"] for row in pageviews_with_consent.collect()]) == 16
 
 
 def test_aggregate_avg_pageviews_per_user(mapped_events_data: DataFrame):
     avg_pageviews_per_user = events.aggregate_avg_pageviews_per_user(mapped_events_data)
+    assert avg_pageviews_per_user.columns == ["datehour", "domain", "country", "avg_pageviews_per_user"]
     assert sum([row["avg_pageviews_per_user"] for row in avg_pageviews_per_user.collect()]) == 21.83
 
 
@@ -73,3 +79,4 @@ def test_aggregate_events_metrics(spark_session: SparkSession, events_data):
     event_schemas = EventSchemas()
     events_metrics = events.aggregate_events_metrics(raw_events)
     assert events_metrics.schema == events_metrics.schema.fromJson(event_schemas.events_metrics)
+    assert events_metrics.count() == 10
