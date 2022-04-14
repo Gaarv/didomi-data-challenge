@@ -12,7 +12,7 @@ To ensure reproducibility given some dependencies that rely a lot on environment
 
 Due to time constraints to build a deployable cluster environment on AWS and dependencies that would have to be provided by reviewers to run the application on a cluster (such as credentials), I decided to focus primarily on delivering a Spark application that runs in local mode.
 
-The code is fundamentally runnable as-is in cluster mode except for some I/O functions such as loading and writing data on S3 (or another data source) that would need implementation.
+The code is fundamentally runnable as-is in cluster mode except for some I/O functions such as loading and writing data on S3 (or another data source) that would need implementation. A similar Docker image could be built and used with AWS EMR EKS, for instance.
 
 Rather than directly loading the challenge input data with `spark.read.json()`, I chose **Hive** in local mode to ingest the data and use the provided `datehour` partitioning.
 
